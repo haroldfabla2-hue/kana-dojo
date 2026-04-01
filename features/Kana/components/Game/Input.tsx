@@ -4,7 +4,7 @@ import { kana } from '@/features/Kana/data/kana';
 import useKanaStore from '@/features/Kana/store/useKanaStore';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
-import { useClick, useCorrect, useError } from '@/shared/hooks/useAudio';
+import { useClick, useCorrect, useError } from '@/shared/hooks/generic/useAudio';
 // import GameIntel from '@/shared/components/Game/GameIntel';
 import { useStopwatch } from 'react-timer-hook';
 import { useStatsStore } from '@/features/Progress';
@@ -15,41 +15,12 @@ import { getGlobalAdaptiveSelector } from '@/shared/lib/adaptiveSelection';
 import { GameBottomBar } from '@/shared/components/Game/GameBottomBar';
 import { isKanaInputAnswerCorrect } from '@/features/Kana/lib/isKanaInputAnswerCorrect';
 import useClassicSessionStore from '@/shared/store/useClassicSessionStore';
+import { useAdaptiveTargetLength } from '@/shared/hooks/game/useAdaptiveTargetLength';
+import { useThemePreferences } from '@/features/Preferences';
+import { cn } from '@/shared/lib/utils';
 
 // Get the global adaptive selector for weighted character selection
 const adaptiveSelector = getGlobalAdaptiveSelector();
-
-// Draw `count` distinct kana characters using weighted adaptive selection
-function drawBatch(selectedKana: string[], count: number): string[] {
-  if (selectedKana.length === 0) return [];
-  const effectiveCount = Math.min(count, selectedKana.length);
-  const result: string[] = [];
-  for (let i = 0; i < effectiveCount; i++) {
-    const pool = selectedKana.filter(k => !result.includes(k));
-    if (pool.length === 0) break;
-    const char = adaptiveSelector.selectWeightedCharacter(pool);
-    adaptiveSelector.markCharacterSeen(char);
-    result.push(char);
-  }
-  return result;
-}
-
-// Get all valid combined romanji answers for a batch of kana
-function getBatchValidAnswers(
-  batch: string[],
-  pairsMap: Record<string, string>,
-  altRomanjiMap: Map<string, string[]>,
-): string[] {
-  const options = batch.map(char => {
-    const primary = pairsMap[char];
-    const alts = altRomanjiMap.get(char) ?? [];
-    return [primary, ...alts].filter(Boolean);
-  });
-  return options.reduce<string[]>(
-    (acc, opts) => acc.flatMap(prev => opts.map(opt => prev + opt)),
-    [''],
-  );
-}
 
 // Helper function to determine if a kana character is hiragana or katakana
 const isHiragana = (char: string): boolean => {
@@ -104,6 +75,8 @@ const InputGame = ({ isHidden, isReverse = false }: InputGameProps) => {
     })),
   );
 
+  const isGlassMode = useThemePreferences().isGlassMode;
+
   const speedStopwatch = useStopwatch({ autoStart: false });
 
   const { playClick } = useClick();
@@ -113,13 +86,17 @@ const InputGame = ({ isHidden, isReverse = false }: InputGameProps) => {
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const {
+    targetLength,
+    recordCorrect: recordTargetLengthCorrect,
+    recordWrong: recordTargetLengthWrong,
+  } = useAdaptiveTargetLength();
 
   const [inputValue, setInputValue] = useState('');
   const [bottomBarState, setBottomBarState] = useState<BottomBarState>('check');
   const [_lastWrongInput, setLastWrongInput] = useState('');
 
   const kanaGroupIndices = useKanaStore(state => state.kanaGroupIndices);
-  const kanaPerRound = useKanaStore(state => state.kanaPerRound);
 
   const selectedKana = useMemo(
     () => kanaGroupIndices.map(i => kana[i].kana).flat(),
@@ -156,27 +133,30 @@ const InputGame = ({ isHidden, isReverse = false }: InputGameProps) => {
     [isReverse, selectedRomaji, selectedKana],
   );
 
-  // State for characters - uses weighted selection for adaptive learning
-  const [correctChar, setCorrectChar] = useState(() => {
-    if (isReverse) {
-      if (selectedRomaji.length === 0) return '';
-      const selected = adaptiveSelector.selectWeightedCharacter(selectedRomaji);
+  const buildTargetPair = useCallback(() => {
+    const sourceArray = isReverse ? selectedRomaji : selectedKana;
+    if (sourceArray.length === 0) return { correctChar: '', targetChar: '' };
+
+    const used = new Set<string>();
+    const promptParts: string[] = [];
+    const answerParts: string[] = [];
+
+    for (let i = 0; i < targetLength; i++) {
+      const available = sourceArray.filter(char => !used.has(char));
+      if (available.length === 0) break;
+      const selected = adaptiveSelector.selectWeightedCharacter(available);
+      used.add(selected);
       adaptiveSelector.markCharacterSeen(selected);
-      return selected;
-    } else {
-      if (selectedKana.length === 0) return '';
-      const selected = adaptiveSelector.selectWeightedCharacter(selectedKana);
-      adaptiveSelector.markCharacterSeen(selected);
-      return selected;
+      promptParts.push(selected);
+      answerParts.push(selectedPairs[selected]);
     }
-  });
 
-  // Batch state — only active when kanaPerRound > 1
-  const [batch, setBatch] = useState<string[]>(() =>
-    kanaPerRound > 1 ? drawBatch(selectedKana, kanaPerRound) : [],
-  );
+    return { correctChar: promptParts.join(''), targetChar: answerParts.join('') };
+  }, [isReverse, selectedRomaji, selectedKana, targetLength, selectedPairs]);
 
-  const targetChar = selectedPairs[correctChar];
+  const [pairData, setPairData] = useState(() => buildTargetPair());
+  const correctChar = pairData.correctChar;
+  const targetChar = pairData.targetChar;
 
   const hasKana = selectedKana.length > 0;
   const hasRomaji = selectedRomaji.length > 0;
@@ -218,88 +198,36 @@ const InputGame = ({ isHidden, isReverse = false }: InputGameProps) => {
     if (isHidden) speedStopwatch.pause();
   }, [isHidden, speedStopwatch]);
 
+  useEffect(() => {
+    if (isReady) {
+      setPairData(buildTargetPair());
+    }
+  }, [buildTargetPair, isReady]);
+
   const generateNewCharacter = useCallback(() => {
     if (!isReady) return;
-    const sourceArray = isReverse ? selectedRomaji : selectedKana;
-    // Use weighted selection - prioritizes characters user struggles with
-    const newChar = adaptiveSelector.selectWeightedCharacter(
-      sourceArray,
-      correctChar,
-    );
-    adaptiveSelector.markCharacterSeen(newChar);
-    setCorrectChar(newChar);
-  }, [isReady, isReverse, selectedRomaji, selectedKana, correctChar]);
+    setPairData(buildTargetPair());
+  }, [isReady, buildTargetPair]);
 
   const handleCheck = () => {
     const trimmedInput = inputValue.trim();
     if (trimmedInput.length === 0) return;
 
+    const isCorrect = isKanaInputAnswerCorrect({
+      inputValue: trimmedInput,
+      correctChar,
+      targetChar,
+      isReverse,
+      altRomanjiMap,
+    });
+
     playClick();
 
-    if (kanaPerRound > 1) {
-      const validAnswers = getBatchValidAnswers(batch, selectedPairs, altRomanjiMap);
-      if (validAnswers.includes(trimmedInput.toLowerCase())) {
-        handleCorrectAnswerBatch();
-      } else {
-        handleWrongAnswerBatch(trimmedInput);
-      }
+    if (isCorrect) {
+      handleCorrectAnswer();
     } else {
-      const isCorrect = isKanaInputAnswerCorrect({
-        inputValue: trimmedInput,
-        correctChar,
-        targetChar,
-        isReverse,
-        altRomanjiMap,
-      });
-      if (isCorrect) {
-        handleCorrectAnswer();
-      } else {
-        handleWrongAnswer(trimmedInput);
-      }
+      handleWrongAnswer(trimmedInput);
     }
-  };
-
-  const handleCorrectAnswerBatch = () => {
-    speedStopwatch.pause();
-    const answerTimeMs = speedStopwatch.totalMilliseconds;
-    addCorrectAnswerTime(answerTimeMs / 1000);
-    recordAnswerTime(answerTimeMs);
-    speedStopwatch.reset();
-    playCorrect();
-    batch.forEach(char => {
-      addCharacterToHistory(char);
-      incrementCharacterScore(char, 'correct');
-      adaptiveSelector.updateCharacterWeight(char, true);
-      if (isHiragana(char)) {
-        incrementHiraganaCorrect();
-      } else if (isKatakana(char)) {
-        incrementKatakanaCorrect();
-      }
-    });
-    incrementCorrectAnswers();
-    setScore(score + batch.length);
-    triggerCrazyMode();
-    resetWrongStreak();
-    setBottomBarState('correct');
-  };
-
-  const handleWrongAnswerBatch = (wrongInput: string) => {
-    setLastWrongInput(wrongInput);
-    setInputValue('');
-    playErrorTwice();
-    batch.forEach(char => {
-      incrementCharacterScore(char, 'wrong');
-      adaptiveSelector.updateCharacterWeight(char, false);
-    });
-    incrementWrongAnswers();
-    if (score - 1 < 0) {
-      setScore(0);
-    } else {
-      setScore(score - 1);
-    }
-    triggerCrazyMode();
-    incrementWrongStreak();
-    setBottomBarState('wrong');
   };
 
   const handleCorrectAnswer = () => {
@@ -316,16 +244,14 @@ const InputGame = ({ isHidden, isReverse = false }: InputGameProps) => {
     setScore(score + 1);
 
     triggerCrazyMode();
-    // Update adaptive weight system - reduces probability of mastered characters
-    adaptiveSelector.updateCharacterWeight(correctChar, true);
-    // Track content-specific stats for achievements (Requirements 1.1-1.8)
-    if (isHiragana(correctChar)) {
-      incrementHiraganaCorrect();
-    } else if (isKatakana(correctChar)) {
-      incrementKatakanaCorrect();
-    }
+    correctChar.split('').forEach(char => {
+      adaptiveSelector.updateCharacterWeight(char, true);
+      if (isHiragana(char)) incrementHiraganaCorrect();
+      else if (isKatakana(char)) incrementKatakanaCorrect();
+    });
     // Reset wrong streak on correct answer (Requirement 10.2)
     resetWrongStreak();
+    recordTargetLengthCorrect();
     setBottomBarState('correct');
     logAttempt({
       questionId: correctChar,
@@ -352,10 +278,11 @@ const InputGame = ({ isHidden, isReverse = false }: InputGameProps) => {
       setScore(score - 1);
     }
     triggerCrazyMode();
-    // Update adaptive weight system - increases probability of difficult characters
-    adaptiveSelector.updateCharacterWeight(correctChar, false);
-    // Track wrong streak for achievements (Requirement 10.2)
+    correctChar.split('').forEach(char =>
+      adaptiveSelector.updateCharacterWeight(char, false),
+    );
     incrementWrongStreak();
+    recordTargetLengthWrong();
     setBottomBarState('wrong');
     logAttempt({
       questionId: correctChar,
@@ -371,15 +298,11 @@ const InputGame = ({ isHidden, isReverse = false }: InputGameProps) => {
   const handleContinue = useCallback(() => {
     playClick();
     setInputValue('');
-    if (kanaPerRound > 1) {
-      setBatch(drawBatch(selectedKana, kanaPerRound));
-    } else {
-      generateNewCharacter();
-    }
+    generateNewCharacter();
     setBottomBarState('check');
     speedStopwatch.reset();
     speedStopwatch.start();
-  }, [playClick, kanaPerRound, selectedKana, generateNewCharacter, speedStopwatch]);
+  }, [playClick, generateNewCharacter, speedStopwatch]);
 
   const _gameMode = isReverse ? 'reverse input' : 'input';
   const canCheck = inputValue.trim().length > 0 && bottomBarState !== 'correct';
@@ -398,33 +321,28 @@ const InputGame = ({ isHidden, isReverse = false }: InputGameProps) => {
       )}
     >
       {/* <GameIntel gameMode={gameMode} /> */}
-      {kanaPerRound > 1 ? (
-        <div className='flex flex-row items-center justify-center gap-6'>
-          {batch.map((char, idx) => (
-            <span key={char + idx} className='text-8xl font-medium'>
-              {char}
-            </span>
-          ))}
-        </div>
-      ) : (
-        <div className='flex flex-row items-center gap-1'>
-          <motion.p
-            className='text-8xl font-medium sm:text-9xl'
-            initial={{ opacity: 0, y: -30, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{
-              type: 'spring',
-              stiffness: 150,
-              damping: 20,
-              mass: 1,
-              duration: 0.5,
-            }}
-            key={correctChar}
-          >
-            {correctChar}
-          </motion.p>
-        </div>
-      )}
+      <div
+        className={cn(
+          'flex flex-row items-center gap-1',
+          isGlassMode && 'rounded-xl bg-(--card-color) px-4 py-2',
+        )}
+      >
+        <motion.p
+          className='text-7xl font-medium sm:text-8xl'
+          initial={{ opacity: 0, x: 30, scale: 0.95 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          transition={{
+            type: 'spring',
+            stiffness: 150,
+            damping: 20,
+            mass: 1,
+            duration: 0.5,
+          }}
+          key={correctChar}
+        >
+          {correctChar}
+        </motion.p>
+      </div>
       <textarea
         ref={inputRef}
         value={inputValue}
@@ -458,11 +376,7 @@ const InputGame = ({ isHidden, isReverse = false }: InputGameProps) => {
         state={bottomBarState}
         onAction={showContinue ? handleContinue : handleCheck}
         canCheck={canCheck}
-        feedbackContent={
-          kanaPerRound > 1
-            ? batch.map(char => selectedPairs[char]).join('')
-            : targetChar
-        }
+        feedbackContent={targetChar}
         buttonRef={buttonRef}
         hideRetry
       />

@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo } from 'react';
 import useVocabStore from '@/features/Vocabulary/store/useVocabStore';
-import { useStatsStore } from '@/features/Progress';
 import VocabSetDictionary from '@/features/Vocabulary/components/SetDictionary';
 import {
   vocabDataService,
@@ -18,7 +17,6 @@ import {
 } from '@/shared/lib/unitSets';
 
 import type { IWord } from '@/shared/types/interfaces';
-import CustomDeckManager from '@/features/Vocabulary/components/CustomDeckManager';
 
 const levelOrder: VocabLevel[] = ['n5', 'n4', 'n3', 'n2', 'n1'];
 const WORDS_PER_SET = 10;
@@ -53,8 +51,6 @@ const VocabCards = () => {
   const setCollapsedRowsForUnit = useVocabStore(
     state => state.setCollapsedRowsForUnit,
   );
-  const allTimeStats = useStatsStore(state => state.allTimeStats);
-
   // Get collapsed rows for current unit from store
   const collapsedRows = useMemo(
     () => collapsedRowsByUnit[selectedVocabCollectionName] || [],
@@ -82,10 +78,6 @@ const VocabCards = () => {
     [],
   );
 
-  if (selectedVocabCollectionName === 'custom') {
-    return <CustomDeckManager />;
-  }
-
   return (
     <LevelSetCards<VocabLevel, IWord>
       levelOrder={levelOrder}
@@ -103,17 +95,8 @@ const VocabCards = () => {
       toggleItems={items => addWordObjs(items)}
       collapsedRows={collapsedRows}
       setCollapsedRows={setCollapsedRows}
-      masteryByKey={allTimeStats.characterMastery}
-      getMasteryKey={item => item.word}
       renderSetDictionary={items => <VocabSetDictionary words={items} />}
       loadingText='Loading vocabulary sets...'
-      tipText={
-        <>
-          💡 <strong>Tip:</strong> Complete some practice sessions to unlock the
-          &apos;Hide Mastered Sets&apos; filter. Sets become mastered when you
-          achieve 90%+ accuracy with 10+ attempts per word.
-        </>
-      }
     />
   );
 };
