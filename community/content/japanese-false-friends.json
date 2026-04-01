@@ -124,5 +124,11 @@
   "termB": "letter (English)",
   "explanation": "手紙 means physical mail, not alphabet letters. (Set 4)",
   "example": "祖母に手紙を書きました。"
+},
+  {
+  "termA": "コンセント (konsento)",
+  "termB": "consent (English)",
+  "explanation": "コンセント means electrical outlet. (Set 6)",
+  "example": "コンセントが足りないので延長コードを使います。"
 }
 ]
