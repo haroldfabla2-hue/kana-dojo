@@ -24,7 +24,7 @@
     "example": "コンセントが足りないので延長コードを使います。",
     "id": 3,
     "issued": false,
-    "completed": false
+    "completed": true
   },
   {
     "termA": "スマート (sumaato)",
@@ -204,7 +204,7 @@
     "example": "コンセントが足りないので延長コードを使います。",
     "id": 23,
     "issued": false,
-    "completed": false
+    "completed": true
   },
   {
     "termA": "スマート (sumaato)",
@@ -302,7 +302,7 @@
     "explanation": "Often means trying something new. (Set 2)",
     "example": "新しい料理にチャレンジしてみる。",
     "id": 34,
-    "issued": false,
+    "issued": true,
     "completed": false
   },
   {
@@ -384,7 +384,7 @@
     "example": "コンセントが足りないので延長コードを使います。",
     "id": 43,
     "issued": false,
-    "completed": false
+    "completed": true
   },
   {
     "termA": "スマート (sumaato)",
@@ -689,7 +689,7 @@
     "explanation": "Often means impression/public image. (Set 4)",
     "example": "会社のイメージが良くなった。",
     "id": 77,
-    "issued": false,
+    "issued": true,
     "completed": false
   },
   {
@@ -744,7 +744,7 @@
     "example": "コンセントが足りないので延長コードを使います。",
     "id": 83,
     "issued": false,
-    "completed": false
+    "completed": true
   },
   {
     "termA": "スマート (sumaato)",
@@ -923,7 +923,7 @@
     "explanation": "コンセント means electrical outlet. (Set 6)",
     "example": "コンセントが足りないので延長コードを使います。",
     "id": 103,
-    "issued": false,
+    "issued": true,
     "completed": false
   },
   {
@@ -1022,7 +1022,7 @@
     "explanation": "Often means trying something new. (Set 6)",
     "example": "新しい料理にチャレンジしてみる。",
     "id": 114,
-    "issued": false,
+    "issued": true,
     "completed": false
   },
   {
