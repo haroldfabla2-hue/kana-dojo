@@ -1239,7 +1239,7 @@
     "english": "Continuation is power",
     "meaning": "Consistency builds strength",
     "completed": false,
-    "issued": false
+    "issued": true
   },
   {
     "id": 139,
@@ -1275,7 +1275,7 @@
     "english": "Not knowing is Buddha",
     "meaning": "Ignorance is bliss",
     "completed": false,
-    "issued": false
+    "issued": true
   },
   {
     "id": 143,
@@ -1599,7 +1599,7 @@
     "english": "See the trees but not the forest",
     "meaning": "Miss the bigger picture",
     "completed": false,
-    "issued": false
+    "issued": true
   },
   {
     "id": 179,
