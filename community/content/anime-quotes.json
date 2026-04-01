@@ -362,10 +362,17 @@
   "character": "Edward Elric"
   },
   {
-  "japanese": "だが…それがいい。",
-  "romaji": "Daga... sore ga ii.",
-  "english": "But... that's what I like. (alt wording 16) (alt wording 68)",
-  "anime": "JoJo's Bizarre Adventure: Diamond is Unbreakable",
-  "character": "Yoshikage Kira"
-}
+  "japanese": "明日の問題は明日の俺に任せる",
+  "romaji": "Ashita no mondai wa ashita no ore ni makaseru",
+  "english": "I'll leave tomorrow's problems to tomorrow's me.",
+  "anime": "One Punch Man",
+  "character": "Saitama"
+  },
+  {
+  "japanese": "オラオラオラオラオラ！",
+  "romaji": "Ora ora ora ora ora!",
+  "english": "Ora ora ora ora ora! (alt wording 8) (alt wording 60)",
+  "anime": "JoJo's Bizarre Adventure: Stardust Crusaders",
+  "character": "Jotaro Kujo"
+},
 ]
